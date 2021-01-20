@@ -1,112 +1,61 @@
-from datetime import datetime, timezone
-from requests.exceptions import ConnectionError
-
-from django_celery_beat.models import PeriodicTask
-from django.db import transaction
-from django.core.cache import cache
-from rest_framework import filters, generics, serializers, status
+from rest_framework import filters, status
+from rest_framework.generics import ListAPIView
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from hackernews_clone.posts.models import Post
+from hackernews_clone.posts.models import Post, ScrapperTracker, APIFetcherTracker
+from hackernews_clone.posts.serializers import PostSerializer
 from hackernews_clone.posts.tasks import scrap_from_web, fetch_from_api
 
 
-class PostSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Post
-        fields = '__all__'
-
-
-class PostList(generics.ListAPIView):
+class PostList(ListAPIView):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
     filter_backends = [filters.SearchFilter]
-    search_fields = ['@subject']
+    search_fields = ["@subject"]
 
     def get(self, request, *args, **kwargs):
-        if cache.get('running'):
-            return Response(
-                {
-                    'message': 'Update with Hackernews In Progress',
-                },
-                status=status.HTTP_409_CONFLICT
-            )
+        if ScrapperTracker.objects.get(pk=1).status == ScrapperTracker.ACTIVE:
+            return Response(status=status.HTTP_409_CONFLICT)
         else:
             return self.list(request, *args, **kwargs)
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 def get_scrapper_info(request):
+    st = ScrapperTracker.objects.get(pk=1)
     context = {
-        'running': cache.get('running'),
-        'last_start_time': cache.get('scrapper_last_start_time'),
-        'last_finish_time': cache.get('scrapper_last_finish_time'),
+        "status": st.get_status_display(),
+        "last_run_at": st.last_run_at,
+        "last_run_finish_at": st.last_run_finish_at,
     }
     return Response(context)
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 def update_using_scrapper(request):
-    if not cache.get('running'):
-        try:
-            with transaction.atomic():
-                periodic_task = PeriodicTask.objects.select_for_update().get(
-                    name='Scrap Posts')
-                periodic_task.last_run_at = datetime.now(tz=timezone.utc)
-                periodic_task.save()
-            scrap_from_web()
-        except ConnectionError:
-            return Response(
-                {
-                    'message': 'Hackernews Connection Problem',
-                },
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
-    else:
-        return Response(
-            {
-                'message': 'Update with Hackernews Already In Progress',
-            },
-            status=status.HTTP_409_CONFLICT
-        )
+    if ScrapperTracker.objects.get(pk=1).status == ScrapperTracker.ACTIVE:
+        return Response(status=status.HTTP_409_CONFLICT)
 
+    scrap_from_web.delay()
     return Response(status=status.HTTP_200_OK)
 
 
-@api_view(['GET'])
+@api_view(["GET"])
 def get_fetch_api_info(request):
+    at = APIFetcherTracker.objects.get(pk=1)
     context = {
-        'running': cache.get('running'),
-        'last_start_time': cache.get('fetch_api_last_start_time'),
-        'last_finish_time': cache.get('fetch_api_last_finish_time'),
+        "status": at.get_status_display(),
+        "last_run_at": at.last_run_at,
+        "last_run_finish_at": at.last_run_finish_at,
     }
     return Response(context)
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 def update_using_api(request):
-    if not cache.get('running'):
-        try:
-            with transaction.atomic():
-                periodic_task = PeriodicTask.objects.select_for_update().get(
-                    name='Fetch Posts From Api')
-                periodic_task.last_run_at = datetime.now(tz=timezone.utc)
-                periodic_task.save()
-            fetch_from_api()
-        except ConnectionError:
-            return Response(
-                {
-                    'message': 'Hackernews API Connection Problem',
-                },
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
-    else:
-        return Response(
-            {
-                'message': 'Update with Hackernews Already In Progress',
-            },
-            status=status.HTTP_409_CONFLICT
-        )
+    if APIFetcherTracker.objects.get(pk=1).status == APIFetcherTracker.ACTIVE:
+        return Response(status=status.HTTP_409_CONFLICT)
 
+    fetch_from_api.delay()
     return Response(status=status.HTTP_200_OK)

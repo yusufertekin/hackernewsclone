@@ -3,20 +3,12 @@
     <div :class="$style.taskInfo">
       <update-box
         style="grid-area: apiUpdateBox"
-        :fetchingActive="fetchingActive"
-        :message="message"
-        @update-fetching-active="updateFetchingActive"
-        @update-message="updateMessage"
         :updateUrl="apiBoxUpdateUrl"
         :refreshUrl="apiBoxRefreshUrl">
         Update Using API
       </update-box>
       <update-box
         style="grid-area: scrapperUpdateBox"
-        :fetchingActive="fetchingActive"
-        :message="message"
-        @update-fetching-active="updateFetchingActive"
-        @update-message="updateMessage"
         :updateUrl="scrapperBoxUpdateUrl"
         :refreshUrl="scrapperBoxRefreshUrl">
         Update Using Scapper
@@ -40,14 +32,14 @@
       </div>
     </div>
     <div :class="$style.content">
-      <div v-if="!fetchingActive" :class="$style.flexCol">
+      <div v-if="!fetchingActive" class="flexCol">
         <post-box
           v-for="post in posts"
           :key="post.id"
           :post="post">
         </post-box>
       </div>
-      <span v-else :class="$style.message">{{ message }}</span>
+      <span v-else :class="$style.message">Update with Hackernews in progress</span>
     </div>
     <div :class="$style.footer">
       <div>
@@ -77,12 +69,13 @@
         refreshIntervalId: null,
         search: null,
         nextUrl: null,
-        fetchingActive: false,
-        message: null,
       }
     },
     
     computed: {
+      fetchingActive() {
+        return this.$store.getters.fetchingActive;
+      },
       apiBoxUpdateUrl() {
         return `${apiHostUrl}posts/update-using-api/`;
       },
@@ -101,7 +94,7 @@
       loadPosts(url, reset=false) {
         if (reset)
           this.posts = []
-        if (url) {
+        if (url)
           this.axios
             .get(url)
             .then((response) => {
@@ -111,10 +104,8 @@
               } 
             })
             .catch((error) => {
-              this.message = error.response.data.message;
-              this.fetchingActive = true;
+              this.$store.dispatch('setFetchingActive', true);
             });
-        }
       },
 
       searchPosts() {
@@ -128,33 +119,13 @@
             }
           })
           .catch((error) => {
-            this.message = error.response.data.message;
-            this.fetchingActive = true;
+            this.$store.dispatch('setFetchingActive', true);
           });
       },
 
-      updateFetchingActive(val) {
-        this.fetchingActive = val;
-      },
-
-      updateMessage(val) {
-        this.message = val;
-      },
-
       handleScroll({ target: { documentElement: { scrollTop, clientHeight, scrollHeight } } }) {
-        if (!this.fetchingActive && scrollTop + clientHeight >= scrollHeight)
+        if (scrollTop + clientHeight >= scrollHeight)
           this.loadPosts(this.nextUrl);
-      }
-    },
-
-    watch: {
-      fetchingActive: function(newVal, oldVal) {
-        if (newVal) {
-          this.refreshIntervalId = setInterval(this.refresh, 5000);
-        } else {
-          clearInterval(this.refreshIntervalId);
-          this.loadPosts(this.url, true);
-        }
       }
     },
 
@@ -166,6 +137,17 @@
 
     unmounted () {
       window.removeEventListener('scroll', this.handleDebouncedScroll);
+    },
+
+    watch: {
+      fetchingActive: function(newVal, oldVal) {
+        if (newVal) {
+         this.refreshIntervalId = setInterval(this.refresh, 5000);
+        } else if (oldVal !== newVal) {
+          clearInterval(this.refreshIntervalId);
+          this.loadPosts(this.url, true);
+        }
+      }
     }
   }
 </script>
@@ -203,7 +185,7 @@ body
 .container
   display: grid
   grid-template-areas: ". taskInfo ." ". header ." ". content ." ". footer ."
-  grid-template-rows: 50px 32px 1fr 32px
+  grid-template-rows: 70px 32px 1fr 32px
   grid-template-columns: 5% 1fr 5%
   padding: 5px
   height: 100vh
@@ -263,5 +245,4 @@ body
   display: inline-flex
   align-items: center
   justify-content: center
-
 </style>

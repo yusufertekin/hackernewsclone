@@ -127,13 +127,13 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose'
         },
-        'rotating_file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'formatter': 'verbose',
-            'maxBytes': 1024 * 1024 * 100,  # 100 mb
-            'filename': 'app.log'
-        },
+#        'rotating_file': {
+#            'level': 'INFO',
+#            'class': 'logging.handlers.RotatingFileHandler',
+#            'formatter': 'verbose',
+#            'maxBytes': 1024 * 1024 * 100,  # 100 mb
+#            'filename': 'app.log'
+#        },
     },
     'loggers': {
         'hackernews_clone': {

@@ -6,12 +6,19 @@
       class="btn">
       <slot></slot>
     </button>
-    <div v-if="!fetchingActive" class="flexCol">
-      <span><strong>Last start time:</strong> {{ lastStartTime }}</span>
-      <span><strong>Last finish time:</strong> {{ lastFinishTime }}</span>
+    <div v-if="fetchingStatus !== 'Active'" class="flexCol">
+      <div :class="$style.row">
+        <strong>Last Run At:</strong>
+        <span>{{ lastRunAt }}</span>
+      </div>
+      <div :class="$style.row">
+        <strong>Last Run Finish At:</strong>
+        <span>{{ lastRunFinishAt }}</span>
+      </div>
     </div>
-    <div v-else>
-      <span>{{ message }}</span>
+    <div :class="$style.row">
+      <strong>Status:</strong>
+      <span>{{ fetchingStatus }}</span>
     </div>
   </div>
 </template>
@@ -22,29 +29,35 @@ import utils from '../utils';
 export default {
   data () {
     return {
-      lastStartTime: null,
-      lastFinishTime: null,
+      lastRunAt: null,
+      lastRunFinishAt: null,
       refreshIntervalId: null,
+      fetchingStatus: null,
     }
   },
-  props: ['fetchingActive', 'message', 'updateUrl', 'refreshUrl'],
+
+  props: ['updateUrl', 'refreshUrl'],
+
+  computed: {
+    fetchingActive() {
+      return this.$store.getters.fetchingActive;
+    }
+  },
+
   methods: {
     update() {
-      this.$emit('update-fetching-active', true);
-      this.$emit('update-message', 'Update with Hackernews In Progress');
-      this.axios
-        .post(this.updateUrl)
-        .catch((error) => {
-          this.$emit('update-message', error.response.data.message);
-        })
+      this.fetchingStatus = 'Active'
+      this.$store.dispatch('setFetchingActive', true);
+      this.axios.post(this.updateUrl)
     },
     refresh() {
       this.axios
         .get(this.refreshUrl)
         .then((response) => {
-          this.$emit('update-fetching-active', Boolean(response.data.running));
-          this.lastStartTime = utils.toLocal(response.data.last_start_time);
-          this.lastFinishTime = utils.toLocal(response.data.last_finish_time);
+          this.fetchingStatus = response.data.status;
+          this.$store.dispatch('setFetchingActive', this.fetchingStatus === 'Active');
+          this.lastRunAt = utils.toLocal(response.data.last_run_at);
+          this.lastRunFinishAt = utils.toLocal(response.data.last_run_finish_at);
         });
     },
   },
@@ -54,10 +67,10 @@ export default {
   },
 
   watch: {
-    fetchingActive: function(newVal, oldVal) {
-      if (newVal) {
+    fetchingStatus: function(newVal, oldVal) {
+      if (newVal === 'Active') {
        this.refreshIntervalId = setInterval(this.refresh, 5000);
-      } else {
+      } else if (oldVal !== newVal) {
         clearInterval(this.refreshIntervalId);
         this.refresh();
       }
@@ -72,5 +85,11 @@ export default {
   flex-direction: column
   justify-content: flex-start
   font-size: 8pt
+
+.row
+  display: grid
+  grid-template-columns: 1fr 1fr
+  grid-template-rows: 1fr
+  margin-top: 2px
 
 </style>

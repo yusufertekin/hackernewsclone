@@ -22,12 +22,10 @@ services:
       dockerfile: dockerfiles/dev.Dockerfile
     image: yusufertekin/hackernews-scrapper-vue
     command: npm run dev
-    expose:
-      - "8080"
-    ports:
-      - "8080:8080"
     volumes:
       - ./hackernews_clone_vue:/web
+    ports:
+      - "8080:8080"
     depends_on:
       - app
 
@@ -53,7 +51,7 @@ services:
     command: >
       bash -c "python wait_for_it.py rabbitmq 5672 &&
       watchmedo auto-restart --directory=./ --pattern=*.py --recursive --
-      celery -A hackernews_clone  beat -l INFO
+      celery -A hackernews_clone beat -l INFO
       --scheduler django_celery_beat.schedulers:DatabaseScheduler"
     volumes:
       - ./hackernews_clone:/code
@@ -81,8 +79,8 @@ services:
     command: > 
       bash -c "python wait_for_it.py rabbitmq 5672 &&
       watchmedo auto-restart --directory=./ --pattern=*.py --recursive --
-      celery -A hackernews_clone worker -Q page_scrapper_queue,api_post_queue
-      --autoscale=6,2 -l INFO"
+      celery -A hackernews_clone worker
+      -Q scrap_page_queue,api_post_queue --autoscale=6,2 -l INFO"
     volumes:
       - ./hackernews_clone:/code
     env_file:
@@ -97,7 +95,22 @@ services:
     command: >
       bash -c "python wait_for_it.py rabbitmq 5672 &&
       watchmedo auto-restart --directory=./ --pattern=*.py --recursive --
-      celery -A hackernews_clone worker -Q create_or_update_post_queue --autoscale=6,2 -l INFO" 
+      celery -A hackernews_clone worker -Q persist_queue --autoscale=6,2 -l INFO" 
+    volumes:
+      - ./hackernews_clone:/code
+    env_file:
+      - .env.dev
+    depends_on:
+      - db
+      - memcached
+      - rabbitmq
+
+  celery_worker_4:
+    image: yusufertekin/hackernews-scrapper
+    command: >
+      bash -c "python wait_for_it.py rabbitmq 5672 &&
+      watchmedo auto-restart --directory=./ --pattern=*.py --recursive --
+      celery -A hackernews_clone worker -Q sentiment_queue --autoscale=6,2 -l INFO" 
     volumes:
       - ./hackernews_clone:/code
     env_file:
