@@ -158,9 +158,12 @@ USE_L10N = True
 USE_TZ = True
 
 CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
-        'LOCATION': os.getenv('MEMCACHED_URL'),
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": os.getenv("REDIS_URL"), 
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
     }
 }
 

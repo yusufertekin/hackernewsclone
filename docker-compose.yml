@@ -2,20 +2,15 @@ version: "3.9"
 
 services:
   db:
-    image: postgres
+    image: postgres:latest
     env_file:
       - .env.dev
+  
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
     
-  memcached:
-    image: memcached:1.6-alpine
-    ports:
-      - 11211:11211
-
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    ports:
-      - 5672:5672
-
   web:
     build: 
       context: hackernews_clone_vue
@@ -35,7 +30,9 @@ services:
       dockerfile: dockerfiles/dev.Dockerfile
     image: yusufertekin/hackernews-scrapper
     command: >
-      bash -c "python wait_for_it.py db 5432 && python manage.py migrate
+      bash -c "python wait_for_it.py db 5432 
+      && python manage.py migrate 
+      && python manage.py loaddata initial_data 
       && python manage.py runserver 0.0.0.0:8000"
     ports:
       - "8000:8000"
@@ -49,7 +46,7 @@ services:
   celery_beat:
     image: yusufertekin/hackernews-scrapper
     command: >
-      bash -c "python wait_for_it.py rabbitmq 5672 &&
+      bash -c "python wait_for_it.py redis 6379 &&
       watchmedo auto-restart --directory=./ --pattern=*.py --recursive --
       celery -A hackernews_clone beat -l INFO
       --scheduler django_celery_beat.schedulers:DatabaseScheduler"
@@ -61,7 +58,7 @@ services:
   celery_worker_1:
     image: yusufertekin/hackernews-scrapper
     command: > 
-      bash -c "python wait_for_it.py rabbitmq 5672 &&
+      bash -c "python wait_for_it.py redis 6379 &&
       watchmedo auto-restart --directory=./ --pattern=*.py --recursive --
       celery -A hackernews_clone worker -Q main_queue
       --autoscale=6,2 -l INFO"
@@ -71,13 +68,12 @@ services:
       - .env.dev
     depends_on:
       - db
-      - memcached
-      - rabbitmq
+      - redis
 
   celery_worker_2:
     image: yusufertekin/hackernews-scrapper
     command: > 
-      bash -c "python wait_for_it.py rabbitmq 5672 &&
+      bash -c "python wait_for_it.py redis 6379 &&
       watchmedo auto-restart --directory=./ --pattern=*.py --recursive --
       celery -A hackernews_clone worker
       -Q scrap_page_queue,api_post_queue --autoscale=6,2 -l INFO"
@@ -87,13 +83,12 @@ services:
       - .env.dev
     depends_on:
       - db
-      - memcached
-      - rabbitmq
+      - redis
 
   celery_worker_3:
     image: yusufertekin/hackernews-scrapper
     command: >
-      bash -c "python wait_for_it.py rabbitmq 5672 &&
+      bash -c "python wait_for_it.py redis 6379 &&
       watchmedo auto-restart --directory=./ --pattern=*.py --recursive --
       celery -A hackernews_clone worker -Q persist_queue --autoscale=6,2 -l INFO" 
     volumes:
@@ -102,13 +97,12 @@ services:
       - .env.dev
     depends_on:
       - db
-      - memcached
-      - rabbitmq
+      - redis
 
   celery_worker_4:
     image: yusufertekin/hackernews-scrapper
     command: >
-      bash -c "python wait_for_it.py rabbitmq 5672 &&
+      bash -c "python wait_for_it.py redis 6379 &&
       watchmedo auto-restart --directory=./ --pattern=*.py --recursive --
       celery -A hackernews_clone worker -Q sentiment_queue --autoscale=6,2 -l INFO" 
     volumes:
@@ -117,13 +111,11 @@ services:
       - .env.dev
     depends_on:
       - db
-      - memcached
-      - rabbitmq
+      - redis
 
   flower:
     image: mher/flower
-    environment:
-      - CELERY_BROKER_URL=pyamqp://rabbitmq:5672
-      - FLOWER_PORT=8888
+    env_file:
+      - .env.dev
     ports:
-      - 8888:8888
+      - 5555:5555

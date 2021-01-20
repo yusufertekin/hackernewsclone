@@ -1,15 +1,16 @@
-Django==3.1.4
-celery==5.0.5
-requests==2.25.1
 beautifulsoup4==4.9.3
-ibm-watson==5.0.2
-django-celery-results==2.0.0
-python-memcached==1.59
+celery==5.0.5
+Django==3.1.4
 django-celery-beat==2.1.0
-django-rest-framework==0.1.0
+django-celery-results==2.0.0
 django-cors-headers==3.6.0
+django-redis==4.12.1
+django-rest-framework==0.1.0
+ibm-watson==5.0.2
 psycopg2-binary==2.8.6
+requests==2.25.1
 timeago==1.0.15
 
 # Latest version of PyJWT not working well with ibm-watson
 PyJWT==1.7.1
+
